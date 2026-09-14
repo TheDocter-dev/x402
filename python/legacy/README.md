@@ -1,22 +1,32 @@
-x402 Python
+# x402 Python
+
 > **Deprecated (v1)**  
 > The code in `python/legacy` implements x402 **v1**. It is **deprecated** and will only receive **security patches**. Please migrate to **v2** on PyPI: use the `x402` package at version **> 2.0.0** (imports and APIs change). See the [Migration guide: v1 to v2](https://docs.x402.org/guides/migration-v1-to-v2).
 > Legacy examples are available at git tag `archive/legacy-v1-examples`.
 >
 > **Settlement-gating note:** the v1 Flask and FastAPI middlewares settle payments only for 2xx responses — a paid route that returns a 3xx is delivered to the client **without settlement** (see #3465). In v2, the Flask middleware had the same gating until it was fixed in **2.15.0** (PR #2826), which settles for any status `< 400`; the v2 FastAPI middleware settled `< 400` from 2.0.0 onward. If any handler on a paid path in your service can return a 3xx response, upgrade to `x402 >= 2.15.0`. Affected releases: all v1 (`x402 == 1.0.0` on PyPI, both adapters) and the v2 **Flask** middleware `>= 2.0.0, < 2.15.0`.
+
 Python package for the x402 payments protocol.
-Installation
+
+## Installation
+
 ```bash
 pip install x402
 ```
-Overview
+
+## Overview
+
 The x402 package provides the core building blocks for implementing the x402 Payment Protocol in Python. It's designed to be used by:
-FastAPI middleware for accepting payments
-Flask middleware for accepting payments
-httpx client for paying resources
-requests client for paying resources
-FastAPI Integration
+
+- FastAPI middleware for accepting payments
+- Flask middleware for accepting payments
+- httpx client for paying resources
+- requests client for paying resources
+
+## FastAPI Integration
+
 The simplest way to add x402 payment protection to your FastAPI application:
+
 ```py
 from fastapi import FastAPI
 from x402.fastapi.middleware import require_payment
@@ -30,7 +40,9 @@ app.middleware("http")(
 async def root():
     return {"message": "Hello World"}
 ```
+
 To protect specific routes:
+
 ```py
 app.middleware("http")(
     require_payment(price="0.01",
@@ -38,8 +50,11 @@ app.middleware("http")(
     path="/foo"  # <-- this can also be a list ex: ["/foo", "/bar"]
 )
 ```
-Flask Integration
+
+## Flask Integration
+
 The simplest way to add x402 payment protection to your Flask application:
+
 ```py
 from flask import Flask
 from x402.flask.middleware import PaymentMiddleware
@@ -59,7 +74,9 @@ payment_middleware.add(
 def root():
     return {"message": "Hello World"}
 ```
+
 To protect specific routes:
+
 ```py
 # Protect specific endpoint
 payment_middleware.add(
@@ -68,9 +85,12 @@ payment_middleware.add(
     pay_to_address="0x209693Bc6afc0C5328bA36FaF03C514EF312287C",
 )
 ```
-Client Integration
-Simple Usage
-Httpx Client
+
+## Client Integration
+
+### Simple Usage
+
+#### Httpx Client
 ```py
 from eth_account import Account
 from x402.clients.httpx import x402HttpxClient
@@ -83,7 +103,8 @@ async with x402HttpxClient(account=account, base_url="https://api.example.com") 
     response = await client.get("/protected-endpoint")
     print(await response.aread())
 ```
-Requests Session Client
+
+#### Requests Session Client
 ```py
 from eth_account import Account
 from x402.clients.requests import x402_requests
@@ -96,8 +117,10 @@ session = x402_requests(account)
 response = session.get("https://api.example.com/protected-endpoint")
 print(response.content)
 ```
-Advanced Usage
-Httpx Extensible Example
+
+### Advanced Usage
+
+#### Httpx Extensible Example
 ```py
 import httpx
 from eth_account import Account
@@ -115,7 +138,8 @@ async with httpx.AsyncClient(base_url="https://api.example.com") as client:
     response = await client.get("/protected-endpoint")
     print(await response.aread())
 ```
-Requests Session Extensible Example
+
+#### Requests Session Extensible Example
 ```py
 import requests
 from eth_account import Account
@@ -136,13 +160,18 @@ session.mount("https://", adapter)
 response = session.get("https://api.example.com/protected-endpoint")
 print(response.content)
 ```
-Manual Server Integration
+
+## Manual Server Integration
+
 If you're not using the FastAPI middleware, you can implement the x402 protocol manually. Here's what you'll need to handle:
-Return 402 error responses with the appropriate response body
-Use the facilitator to validate payments
-Use the facilitator to settle payments
-Return the appropriate response header to the caller
+
+1. Return 402 error responses with the appropriate response body
+2. Use the facilitator to validate payments
+3. Use the facilitator to settle payments
+4. Return the appropriate response header to the caller
+
 Here's an example of manual integration:
+
 ```py
 import base64
 import json
@@ -194,4 +223,5 @@ async def foo(request: Request, response: Response):
             status_code=402,
         )
 ```
-For more examples and advanced usage patterns, check out our examples directory.
+
+For more examples and advanced usage patterns, check out our [examples directory](https://github.com/x402-foundation/x402/tree/main/examples/python/legacy/).
