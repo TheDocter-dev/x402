@@ -1,8 +1,10 @@
-# Settlement-gating note: paid 3xx responses delivered without settlement (x402 Python, v1 and v2 Flask < 2.15.0)
+# Settlement-gating note: paid 3xx responses delivered without settlement (x402 Python, v1 and v2 Flask >= 2.0.0, < 2.11.0)
 
 **Status:** DRAFT — prepared for the x402 maintainers; not reviewed or endorsed by them. Lives at https://github.com/TheDocter-dev/x402/blob/settle-gating-note/settlement-gating-note.md until they choose where it should live.
 **Tracking issue:** x402-foundation/x402#3465
-**Date:** 2026-09-14
+**Date:** 2026-09-14 (boundary corrected 2026-10-04 — see Correction below)
+
+**Correction (4 Oct 2026):** the v2 Flask settlement gate widened from 2xx-only to <400 at release 2.11.0 (PR #2388, merged 20 May 2026), not at 2.15.0 as previously stated; PR #2826 (2.15.0) fixed a main-branch regression of the same guard that did not reach a shipped release. Affected range for the 2xx-only Flask gate: >= 2.0.0, < 2.11.0. Verified wheel-by-wheel; see Ledger rows 2.11.0-2.15.0.
 
 ## Summary
 
@@ -14,17 +16,18 @@ been verified as having paid, receives the resource, and no funds move.
 
 Affected: the deprecated v1 line (published on PyPI as `x402==1.0.0`,
 2025-12-10) in **both** the Flask and FastAPI adapters, and the v2 **Flask**
-middleware for all releases `>= 2.0.0, < 2.15.0`. The v2 FastAPI middleware
+middleware for all releases `>= 2.0.0, < 2.11.0`. The v2 FastAPI middleware
 settled `< 400` from 2.0.0 onward and is not affected. The v2 Flask gate was
-fixed in **2.15.0** via PR #2826, which settles for any response status
-`< 400`.
+fixed in **2.11.0** via PR #2388, which settles for any response status
+`< 400` (PR #2826 in 2.15.0 fixed a main-branch regression of the same guard
+that did not reach a shipped release).
 
 ## Who is affected
 
 You are exposed if **both** of these are true:
 
 1. Your service depends on `x402==1.0.0` (PyPI, either adapter), or uses the
-   v2 **Flask** middleware on `x402 >= 2.0.0, < 2.15.0`; and
+   v2 **Flask** middleware on `x402 >= 2.0.0, < 2.11.0`; and
 2. Any handler behind the payment middleware can return a 3xx response —
    redirects (`301/302/303/307/308`), `304 Not Modified`, or any framework
    behavior that produces them (trailing-slash redirects, conditional GET with
@@ -63,19 +66,26 @@ if response.status_code < 200 or response.status_code >= 300:
     return response
 ```
 
-### v2 Flask (< 2.15.0)
+### v2 Flask (>= 2.0.0, < 2.11.0)
 
 The v2 Flask middleware gated settlement on `200 <= status < 300`
 (`x402/http/middleware/flask.py:414` in the 2.0.0 wheel; `:438-439` in the
-2.10.0 wheel). Fixed in **2.15.0** (PR #2826): settlement proceeds for any
-status `< 400` (`flask.py:420`, cancel path `:408`; current main
-`flask.py:486`), with a regression test at
+2.10.0 wheel). Fixed in **2.11.0** (PR #2388): on >=400 the settlement
+dispatch is cancelled (`dispatcher.cancel_sync`; `flask.py:447` in 2.11.0,
+`:408` from 2.12.0 through 2.14.x) and settlement proceeds for any status
+`< 400`. PR #2826 (2.15.0) later fixed a main-branch regression of the guard
+that did not reach a shipped release (`flask.py:420` in the 2.15.0 wheel;
+current main `flask.py:489`). Regression test at
 `python/x402/tests/unit/http/middleware/test_flask.py:788`.
 
 The v2 FastAPI middleware settles unless the status is `>= 400`
 (`x402/http/middleware/fastapi.py:317` in the 2.0.0 wheel; `:337` in 2.10.0)
 and was not affected at any v2 release. v2 ships exactly these two middleware
-adapters, so this boundary map is exhaustive.
+adapters. An earlier version of this section called this boundary map
+exhaustive on the strength of the 2.0.0, 2.10.0, and 2.15.0 boundary wheels;
+the releases in between had not been read. The 2026-10-03/04 backlog
+verification read every release wheel-by-wheel (sha256 per version in the
+Settle Ledger rows); the corrected boundary appears above.
 
 ### Verification
 
@@ -104,7 +114,7 @@ grep for the right string when auditing v1 services.
 
 ## Mitigation
 
-- **Upgrade to `x402 >= 2.15.0`.** This is the only complete fix; v1 is
+- **Upgrade to `x402 >= 2.11.0`.** This is the only complete fix; v1 is
   deprecated and this behavior is part of what the v2 rewrite corrected.
 - If you cannot upgrade immediately: eliminate 3xx from paid paths (no
   redirects behind the middleware, disable conditional GET on paid paths), or
@@ -123,4 +133,8 @@ documents the behavior that ships today.
 - Initial report and version-boundary map: Settle (@TheDocter-dev)
 - Independent wheel-level reproduction, FastAPI v1 path discovery, response-body
   buffering observation, and `X-PAYMENT` header correction: @halobartku
-- v2 fix: @phdargen (PR #2826)
+- v2 gate widening (2.11.0): PR #2388
+- main-branch regression fix (2.15.0): @phdargen (PR #2826)
+- Settle backlog verification, 2026-10-03/04 — every release from 2.1.0
+  through 2.14.0 read directly from its published wheel (2.13.0, 2.13.1,
+  2.14.0 read on 2026-10-04); per-version sha256 in the Settle Ledger rows.
